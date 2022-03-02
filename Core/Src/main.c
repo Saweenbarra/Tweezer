@@ -31,6 +31,9 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define TX_BUFF_SIZE 512
+#define SAMPLE_BUFF_SIZE 64
+#define BIAS_BUFF_SIZE 8
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -51,7 +54,9 @@ DMA_HandleTypeDef hdma_tim6_up;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-uint16_t data[2] = {0xFFFF, 0x0000};
+static uint16_t ODR_Buff[TX_BUFF_SIZE];
+static volatile uint16_t samples[SAMPLE_BUFF_SIZE];
+//uint16_t data[2] = {0xFFFF, 0x0000};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -64,7 +69,87 @@ static void MX_USART1_UART_Init(void);
 static void MX_DMA_Init(void);
 static void MX_TIM6_Init(void);
 /* USER CODE BEGIN PFP */
+uint32_t calcBuffLoc(uint32_t startPos, uint32_t offSet, uint32_t buffSize)
+{
+    uint32_t newLoc = startPos + offSet;
 
+    if (newLoc < buffSize)
+    {
+        return newLoc;
+    }
+    else
+    {
+        return newLoc - buffSize; // Loop Around
+    }
+}
+void generate_ODR_Buff()
+{
+	const uint8_t singlePhaseBuff[TX_BUFF_SIZE] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0};
+	const uint8_t biasBuff[BIAS_BUFF_SIZE] = {0, 0, 0, 1, 1, 1, 1, 1};
+
+	uint32_t tx0Loc, tx1Loc, tx2Loc, tx3Loc, tx4Loc, tx5Loc, tx6Loc, tx7Loc = 0; // 0 ... 512-1: TX buffer locations
+	uint32_t biasLoc = 0;                                                        // 0 ... 8-1: Bias buffer location
+	uint32_t period = 0;                                                         // Period signal current output pin state
+	uint32_t timeBase = 0;                                                       // Timebase signal current output pin state
+	uint32_t adcTrig = 0;                                                        // ADC external trigger signal current output pin state
+	uint32_t ODRVal = 0;                                                        // Output data register state for all signals combined
+
+	for (uint32_t i = 0; i < TX_BUFF_SIZE; i++)
+	{
+		tx0Loc = i;
+		/* Calculate other TX signals LUT location 45 degrees phase shifted */
+		tx1Loc = calcBuffLoc(tx0Loc, TX_BUFF_SIZE / 8 * 1, TX_BUFF_SIZE);
+		tx2Loc = calcBuffLoc(tx0Loc, TX_BUFF_SIZE / 8 * 2, TX_BUFF_SIZE);
+		tx3Loc = calcBuffLoc(tx0Loc, TX_BUFF_SIZE / 8 * 3, TX_BUFF_SIZE);
+		tx4Loc = calcBuffLoc(tx0Loc, TX_BUFF_SIZE / 8 * 4, TX_BUFF_SIZE);
+		tx5Loc = calcBuffLoc(tx0Loc, TX_BUFF_SIZE / 8 * 5, TX_BUFF_SIZE);
+		tx6Loc = calcBuffLoc(tx0Loc, TX_BUFF_SIZE / 8 * 6, TX_BUFF_SIZE);
+		tx7Loc = calcBuffLoc(tx0Loc, TX_BUFF_SIZE / 8 * 7, TX_BUFF_SIZE);
+
+		/* calculate debug signals */
+		period = (tx0Loc < TX_BUFF_SIZE / 2) ? 0 : 1;
+		timeBase = (tx0Loc % 2) ? 0 : 1; //flips every sample, timebase for debugging
+
+		/* Calculate ADC external trigger signal */
+		adcTrig = ((tx0Loc + 7) % 8) ? 0 : 1; //ADC trigger signal every 8T, Offset by 6 to align ADC trigger (rising edge) on second period when the bias is low.
+
+		/* building the OCTL value */
+		ODRVal = 0; //Set all pins low default
+
+		if (singlePhaseBuff[tx0Loc])
+			ODRVal |= PWM0_Pin;
+		if (singlePhaseBuff[tx1Loc])
+			ODRVal |= PWM45_Pin;
+		if (singlePhaseBuff[tx2Loc])
+			ODRVal |= PWM90_Pin;
+		if (singlePhaseBuff[tx3Loc])
+			ODRVal |= PWM135_Pin;
+		if (singlePhaseBuff[tx4Loc])
+			ODRVal |= PWM180_Pin;
+		if (singlePhaseBuff[tx5Loc])
+			ODRVal |= PWM225_Pin; //STM32l433RCTxP does not have Port C Pin 5
+		if (singlePhaseBuff[tx6Loc])
+			ODRVal |= PWM270_Pin;
+		if (singlePhaseBuff[tx7Loc])
+			ODRVal |= PWM315_Pin;
+		if (biasBuff[biasLoc])
+			ODRVal |= BIAS_Pin; // Bias signal: 8T Period 3T LOW 5T HIGH
+		if (adcTrig)
+			ODRVal |= ADC_TRIG_OUT_Pin; // ADC external trigger signal: 8T Period
+		if (timeBase)
+			ODRVal |= TIMEBASE_Pin;     // DBG signal: TimeBase smallest period 1T
+		if (period)
+			ODRVal |= PERIOD_Pin; // DBG signal: Period is the modulated Sine period. 512/2=256, 256T HIGH followed by 256T LOW
+
+		/* Store OCTL value in buffer */
+		ODR_Buff[i] = ODRVal;
+
+		/* Loop over bias signal template buffer when end is reached*/
+		biasLoc++;
+		if (biasLoc >= BIAS_BUFF_SIZE)
+			biasLoc = 0;
+	}
+}
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -107,7 +192,8 @@ int main(void)
   MX_DMA_Init();
   MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
-  HAL_DMA_Start(&hdma_tim6_up, (uint32_t)&data, (uint32_t)&GPIOC->ODR, 2);
+  generate_ODR_Buff();
+  HAL_DMA_Start(&hdma_tim6_up, (uint32_t)&ODR_Buff, (uint32_t)&GPIOC->ODR, TX_BUFF_SIZE);
   __HAL_TIM_ENABLE_DMA(&htim6, TIM_DMA_UPDATE);
   HAL_TIM_Base_Start(&htim6);
   //__HAL_TIM_ENABLE_DMA(&htim2, TIM_DMA_UPDATE);
@@ -158,7 +244,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
   RCC_OscInitStruct.PLL.PLLM = 1;
-  RCC_OscInitStruct.PLL.PLLN = 10;
+  RCC_OscInitStruct.PLL.PLLN = 8;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV7;
   RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
   RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
@@ -175,7 +261,7 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_3) != HAL_OK)
   {
     Error_Handler();
   }
@@ -354,9 +440,9 @@ static void MX_TIM6_Init(void)
 
   /* USER CODE END TIM6_Init 1 */
   htim6.Instance = TIM6;
-  htim6.Init.Prescaler = 4880;
+  htim6.Init.Prescaler = 1-1;
   htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim6.Init.Period = 65535;
+  htim6.Init.Period = 246-1;
   htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
   {
