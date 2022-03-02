@@ -32,7 +32,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define TX_BUFF_SIZE 512
-#define SAMPLE_BUFF_SIZE 64
+#define SAMPLE_BUFF_SIZE 128 //2 periods
 #define BIAS_BUFF_SIZE 8
 /* USER CODE END PD */
 
@@ -55,7 +55,7 @@ UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
 static uint16_t ODR_Buff[TX_BUFF_SIZE];
-static volatile uint16_t samples[SAMPLE_BUFF_SIZE];
+static volatile uint16_t samples[SAMPLE_BUFF_SIZE] = {0};
 //uint16_t data[2] = {0xFFFF, 0x0000};
 /* USER CODE END PV */
 
@@ -180,7 +180,7 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-
+  MX_DMA_Init();
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -196,6 +196,8 @@ int main(void)
   HAL_DMA_Start(&hdma_tim6_up, (uint32_t)&ODR_Buff, (uint32_t)&GPIOC->ODR, TX_BUFF_SIZE);
   __HAL_TIM_ENABLE_DMA(&htim6, TIM_DMA_UPDATE);
   HAL_TIM_Base_Start(&htim6);
+
+  HAL_ADC_Start_DMA(&hadc1, (uint32_t*)samples, SAMPLE_BUFF_SIZE);
   //__HAL_TIM_ENABLE_DMA(&htim2, TIM_DMA_UPDATE);
   /* USER CODE END 2 */
 
@@ -298,7 +300,7 @@ static void MX_ADC1_Init(void)
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConv = ADC_EXTERNALTRIG_EXT_IT11;
   hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_RISING;
-  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.DMAContinuousRequests = ENABLE;
   hadc1.Init.Overrun = ADC_OVR_DATA_PRESERVED;
   hadc1.Init.OversamplingMode = DISABLE;
   if (HAL_ADC_Init(&hadc1) != HAL_OK)
@@ -564,12 +566,15 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef* hadc)
 {
-
-	//GPIOC->ODR = 0xFFFF;
-	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_9);
-
+	int a = 0;
+	a++;
+}
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
+{
+	int a = 0;
+	a++;
 }
 /* USER CODE END 4 */
 
