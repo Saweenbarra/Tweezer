@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "stdio.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -69,6 +69,14 @@ static void MX_USART1_UART_Init(void);
 static void MX_DMA_Init(void);
 static void MX_TIM6_Init(void);
 /* USER CODE BEGIN PFP */
+int _write(int file, char *ptr, int len)
+{
+  /* Implement your write code here, this is used by puts and printf for example */
+  int i=0;
+  for(i=0 ; i<len ; i++)
+    ITM_SendChar((*ptr++));
+  return len;
+}
 uint32_t calcBuffLoc(uint32_t startPos, uint32_t offSet, uint32_t buffSize)
 {
     uint32_t newLoc = startPos + offSet;
@@ -85,7 +93,8 @@ uint32_t calcBuffLoc(uint32_t startPos, uint32_t offSet, uint32_t buffSize)
 void generate_ODR_Buff()
 {
 	const uint8_t singlePhaseBuff[TX_BUFF_SIZE] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0};
-	const uint8_t biasBuff[BIAS_BUFF_SIZE] = {0, 0, 0, 1, 1, 1, 1, 1};
+	//const uint8_t biasBuff[BIAS_BUFF_SIZE] = {0, 0, 0, 1, 1, 1, 1, 1};
+	const uint8_t biasBuff[BIAS_BUFF_SIZE] = {1, 1, 1, 0, 0, 0, 0, 0};
 
 	uint32_t tx0Loc, tx1Loc, tx2Loc, tx3Loc, tx4Loc, tx5Loc, tx6Loc, tx7Loc = 0; // 0 ... 512-1: TX buffer locations
 	uint32_t biasLoc = 0;                                                        // 0 ... 8-1: Bias buffer location
@@ -112,7 +121,7 @@ void generate_ODR_Buff()
 
 		/* Calculate ADC external trigger signal */
 		adcTrig = ((tx0Loc + 7) % 8) ? 0 : 1; //ADC trigger signal every 8T, Offset by 6 to align ADC trigger (rising edge) on second period when the bias is low.
-
+		//adcTrig = ((tx0Loc) % 8) ? 0 : 1;
 		/* building the OCTL value */
 		ODRVal = 0; //Set all pins low default
 
@@ -205,6 +214,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  printf("Test\n\r");
 	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER0, 0xffff, 0xffff);
 	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER2, 0xffff, 0xffff);
 	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER4, 0xffff, 0xffff);
@@ -541,10 +551,10 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pins : PWM0_Pin PWM45_Pin PWM90_Pin PWM135_Pin
                            PWM180_Pin PWM225_Pin PWM270_Pin PWM315_Pin
-                           BIAS_Pin ADC_TRIG_OUT_Pin PERIOD_Pin TIMEBASE_Pin */
+                           ADC_TRIG_OUT_Pin PERIOD_Pin TIMEBASE_Pin */
   GPIO_InitStruct.Pin = PWM0_Pin|PWM45_Pin|PWM90_Pin|PWM135_Pin
                           |PWM180_Pin|PWM225_Pin|PWM270_Pin|PWM315_Pin
-                          |BIAS_Pin|ADC_TRIG_OUT_Pin|PERIOD_Pin|TIMEBASE_Pin;
+                          |ADC_TRIG_OUT_Pin|PERIOD_Pin|TIMEBASE_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -562,6 +572,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : BIAS_Pin */
+  GPIO_InitStruct.Pin = BIAS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(BIAS_GPIO_Port, &GPIO_InitStruct);
 
 }
 
