@@ -69,8 +69,6 @@ void Error_Handler(void);
 #define PWM135_GPIO_Port GPIOC
 #define SHIELD_Pin GPIO_PIN_2
 #define SHIELD_GPIO_Port GPIOA
-#define BTN_Pin GPIO_PIN_4
-#define BTN_GPIO_Port GPIOA
 #define PWM180_Pin GPIO_PIN_4
 #define PWM180_GPIO_Port GPIOC
 #define PWM225_Pin GPIO_PIN_6

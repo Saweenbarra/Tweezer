@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "stdio.h"
+#include "math.h""
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -55,7 +56,28 @@ UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
 static uint16_t ODR_Buff[TX_BUFF_SIZE];
-static volatile uint16_t samples[SAMPLE_BUFF_SIZE] = {0};
+static uint16_t samples[SAMPLE_BUFF_SIZE] = {0};
+static uint16_t processBuff[SAMPLE_BUFF_SIZE/2] = {0};
+
+static double cosAngLut[32];
+static double sinAngLut[32];
+
+static double even[32];
+static double odd[32];
+static double demol[32];
+
+static double k = 1; //Frequency bin of interest 1hz
+
+static double real = 0; //Real part of sensor signal
+static double imag = 0; //Imaginary part of sensor signal
+
+static double magnitude = 0; //Amplitude of sensor signal
+static double phaseRad = 0;  //Phase in radians
+static double phaseDeg = 0;  //Phase in degrees
+
+static int quadrant = 1;
+
+uint8_t dataRdyFlag = 0;
 //uint16_t data[2] = {0xFFFF, 0x0000};
 /* USER CODE END PV */
 
@@ -76,6 +98,16 @@ int _write(int file, char *ptr, int len)
   for(i=0 ; i<len ; i++)
     ITM_SendChar((*ptr++));
   return len;
+}
+void generateLuts()
+{
+    for (int i = 0; i < 32; i++)
+    {
+        double angle = (2 * M_PI * (double)i * k) / 32;
+
+        cosAngLut[i] = cos(angle);
+        sinAngLut[i] = sin(angle);
+    }
 }
 uint32_t calcBuffLoc(uint32_t startPos, uint32_t offSet, uint32_t buffSize)
 {
@@ -159,6 +191,106 @@ void generate_ODR_Buff()
 			biasLoc = 0;
 	}
 }
+void sensor_signalProcessing()
+{
+    /*Split even and odd samples */
+    int eLoc = 0;
+    int oLoc = 0;
+    for (uint32_t i = 0; i < 64; i++)
+    {
+        if (i % 2)
+        {
+            even[eLoc] = (double)processBuff[i];
+            eLoc++;
+        }
+        else
+        {
+            odd[oLoc] = (double)processBuff[i];
+            oLoc++;
+        }
+    }
+
+    /* demodulate: convert sampled signal to sine*/
+    for (uint32_t i = 0; i < 32; i++)
+    {
+        demol[i] = even[i] - odd[i];
+    }
+
+    //Demol: LP filter test 4 sample avg
+    /*for (uint32_t i = 0; i < 32; i++)
+    {
+        demolLp[i] = (demol[i] + demol[calcBuffLoc(i, 1, 32)] + demol[calcBuffLoc(i, 2, 32)] + demol[calcBuffLoc(i, 3, 32)]) / 4;
+    }*/
+
+    //Demol: LP filter test 8 sample avg
+    // for (int i = 0; i < 32; i++)
+    // {
+    //     demolLp[i] = (demol[i] + demol[calcBuffLoc(i, 1, 32)] + demol[calcBuffLoc(i, 2, 32)] + demol[calcBuffLoc(i, 3, 32)] + demol[calcBuffLoc(i, 4, 32)] + demol[calcBuffLoc(i, 5, 32)] + demol[calcBuffLoc(i, 6, 32)] + demol[calcBuffLoc(i, 7, 32)]) / 8;
+    // }
+
+    /// calculate DFT for single frequency bin @ 1Hz
+    /// The sampling frequency in Hz = 64 hz
+    ///
+    /// Bin frequency = k*SamplerateHz/SampleSize = 1*64/64 = 1Hz
+    // double sumrealTemp = 0;
+    // double sumimagTemp = 0;
+    // for (int i = 0; i < 32; i++)
+    // {
+    //     double angle = (2 * M_PI * (double)i * k) / 32;
+
+    //     // sumrealTemp += (double)demol[i] * cos(angle);
+    //     // sumimagTemp += -(double)demol[i] * sin(angle);
+
+    //     sumrealTemp += (double)demolLp[i] * cos(angle);
+    //     sumimagTemp += -(double)demolLp[i] * sin(angle);
+    // }
+
+    /* Fast dft using precomputed lookup tables for cos and sine part*/
+    double sumrealTemp = 0;
+    double sumimagTemp = 0;
+
+    for (uint32_t i = 0; i < 32; i++)
+    {
+        sumrealTemp += (double)demol[i] * cosAngLut[i];
+        sumimagTemp += -(double)demol[i] * sinAngLut[i];
+    }
+
+    // dft coefficients at the frequency bin of interest (1hz) in complex form
+    real = sumrealTemp; //X-axis
+    imag = sumimagTemp; //Y-axis
+
+    // Calculate phase
+    if (real >= 0 && imag >= 0)
+    {
+        //1-Quadrant (top right) [+, +]
+        phaseRad = atan2(imag, real);
+        quadrant = 1;
+    }
+    else if (real < 0 && imag >= 0)
+    {
+        //2-Quadrant (top left) [-, +]
+        phaseRad = atan2(imag, real);
+        quadrant = 2;
+    }
+    else if (real < 0 && imag < 0)
+    {
+        //3-Quadrant (bottom left) [-, -]
+        phaseRad = 2 * M_PI + atan2(imag, real);
+        quadrant = 3;
+    }
+    else if (real >= 0 && imag < 0)
+    {
+        //4-Quadrant (bottom right) [+, -] #Optimization: do not check last quadrant just use else
+        phaseRad = 2 * M_PI + atan2(imag, real);
+        quadrant = 4;
+    }
+
+    // phaseDeg = (phaseRad * 180) / M_PI; // 0 to 360 degrees
+    phaseDeg = round((phaseRad * 180) / M_PI);
+
+    // Calculate magnitude
+    magnitude = sqrt(fabs(real) + fabs(imag));
+}
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -202,6 +334,7 @@ int main(void)
   MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
   generate_ODR_Buff();
+  generateLuts();
   HAL_DMA_Start(&hdma_tim6_up, (uint32_t)&ODR_Buff, (uint32_t)&GPIOC->ODR, TX_BUFF_SIZE);
   __HAL_TIM_ENABLE_DMA(&htim6, TIM_DMA_UPDATE);
   HAL_TIM_Base_Start(&htim6);
@@ -214,8 +347,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  printf("Test\n\r");
-	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER0, 0xffff, 0xffff);
+	  /*HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER0, 0xffff, 0xffff);
 	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER2, 0xffff, 0xffff);
 	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER4, 0xffff, 0xffff);
 	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER6, 0xffff, 0xffff);
@@ -223,7 +355,13 @@ int main(void)
 	  HAL_Delay(500);
 	  HAL_LCD_Clear(&hlcd);
 	  HAL_LCD_UpdateDisplayRequest(&hlcd);
-	  HAL_Delay(500);
+	  HAL_Delay(500);*/
+	  if(dataRdyFlag)
+	  {
+		  dataRdyFlag = 0;
+		  sensor_signalProcessing();
+		  printf("%i\n\r", (int)phaseDeg);
+	  }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -567,12 +705,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(SHIELD_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : BTN_Pin PA11 */
-  GPIO_InitStruct.Pin = BTN_Pin|GPIO_PIN_11;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
   /*Configure GPIO pin : BIAS_Pin */
   GPIO_InitStruct.Pin = BIAS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
@@ -580,18 +712,24 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(BIAS_GPIO_Port, &GPIO_InitStruct);
 
+  /*Configure GPIO pins : PA11 PA12 */
+  GPIO_InitStruct.Pin = GPIO_PIN_11|GPIO_PIN_12;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
 }
 
 /* USER CODE BEGIN 4 */
 void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef* hadc)
 {
-	int a = 0;
-	a++;
+	memcpy(processBuff, samples, 128);
+	dataRdyFlag = 1;
 }
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
-	int a = 0;
-	a++;
+	memcpy(processBuff, samples+64, 128);
+	dataRdyFlag = 1;
 }
 /* USER CODE END 4 */
 
