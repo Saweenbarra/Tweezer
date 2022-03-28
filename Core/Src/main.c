@@ -22,7 +22,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "stdio.h"
-#include "math.h""
+#include "math.h"
+#include <stdint.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -55,6 +56,24 @@ DMA_HandleTypeDef hdma_tim6_up;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
+// random data for test
+int D = 0;
+// base display data array
+uint16_t Display[4] = {0,0,0,0};
+// array for individual values
+int data[4];
+// lookup table for data
+uint16_t X0[4] = {1,3,2,3};
+uint16_t X1[4] = {0,2,2,0};
+uint16_t X2[4] = {1,1,3,2};
+uint16_t X3[4] = {1,2,3,2};
+uint16_t X4[4] = {0,2,3,1};
+uint16_t X5[4] = {1,2,1,3};
+uint16_t X6[4] = {1,3,1,3};
+uint16_t X7[4] = {0,2,2,2};
+uint16_t X8[4] = {1,3,3,3};
+uint16_t X9[4] = {1,2,3,3};
+//DISPLAYYYYYYYY ^^^^^^^^^^
 static uint16_t ODR_Buff[TX_BUFF_SIZE];
 static uint16_t samples[SAMPLE_BUFF_SIZE] = {0};
 static uint16_t processBuff[SAMPLE_BUFF_SIZE/2] = {0};
@@ -91,6 +110,92 @@ static void MX_USART1_UART_Init(void);
 static void MX_DMA_Init(void);
 static void MX_TIM6_Init(void);
 /* USER CODE BEGIN PFP */
+// configures data into an array of 4 individual values
+void configure(int* ptr, int D){
+      //int dec = D*100;
+		int dec = D;
+      ptr += 3;
+      for(int i = 0; i < 4; i++){
+            int x = pow(10,i);
+            *ptr = (dec/x)%10;
+            ptr--;
+      }
+}
+void DisplayUpdate(uint16_t* displayptr, int* dataptr){
+      int LS = 3;
+      uint16_t *originaldisplayptr = displayptr;
+
+      for(int j = 2; j < 6; j++){
+            displayptr = originaldisplayptr;
+            switch (*dataptr){
+                  case 0:
+                        for(int i = 0; i < sizeof(data)/sizeof(data[0]); i++){
+                              *displayptr = Display[i] ^ (X0[i] << LS);
+                              displayptr++;
+                        }
+                        break;
+                  case 1:
+                        for(int i = 0; i < sizeof(data)/sizeof(data[0]); i++){
+                              *displayptr = Display[i] ^ (X1[i] << LS);
+                              printf("LS = %i\n", X1[i] << LS);
+                              printf("display ptr = %i\n", *displayptr);
+                              displayptr++;
+                        }
+                        break;
+                  case 2:
+                        for(int i = 0; i < sizeof(data)/sizeof(data[0]); i++){
+                              *displayptr = Display[i] ^ (X2[i] << LS);
+                              displayptr++;
+                        }
+                        break;
+                  case 3:
+                        for(int i = 0; i < sizeof(data)/sizeof(data[0]); i++){
+                              *displayptr = Display[i] ^ (X3[i] << LS);
+                              displayptr++;
+                        }
+                        break;
+                  case 4:
+                        for(int i = 0; i < sizeof(data)/sizeof(data[0]); i++){
+                              *displayptr = Display[i] ^ (X4[i] << LS);
+                              displayptr++;
+                        }
+                        break;
+                  case 5:
+                        for(int i = 0; i < sizeof(data)/sizeof(data[0]); i++){
+                              *displayptr = Display[i] ^ (X5[i] << LS);
+                              displayptr++;
+                        }
+                        break;
+                  case 6:
+                        for(int i = 0; i < sizeof(data)/sizeof(data[0]); i++){
+                              *displayptr = Display[i] ^ (X6[i] << LS);
+                              displayptr++;
+                        }
+                        break;
+                  case 7:
+                        for(int i = 0; i < sizeof(data)/sizeof(data[0]); i++){
+                              *displayptr = Display[i] ^ (X7[i] << LS);
+                              displayptr++;
+                        }
+                        break;
+                  case 8:
+                        for(int i = 0; i < sizeof(data)/sizeof(data[0]); i++){
+                              *displayptr = Display[i] ^ (X8[i] << LS);
+                              displayptr++;
+                        }
+                        break;
+                  case 9:
+                        for(int i = 0; i < sizeof(data)/sizeof(data[0]); i++){
+                              *displayptr = Display[i] ^ (X9[i] << LS);
+                              displayptr++;
+                        }
+                        break;
+            }
+            LS =  LS + j;
+            dataptr++;
+      }
+}
+//DISPLAYYYYYY^^^^^^^
 int _write(int file, char *ptr, int len)
 {
   /* Implement your write code here, this is used by puts and printf for example */
@@ -341,12 +446,43 @@ int main(void)
 
   HAL_ADC_Start_DMA(&hadc1, (uint32_t*)samples, SAMPLE_BUFF_SIZE);
   //__HAL_TIM_ENABLE_DMA(&htim2, TIM_DMA_UPDATE);
+
+
+
+	/*//find the size of array
+	int size = sizeof(data)/sizeof(data[0]);
+
+	//declare new array to store reverse of original array
+	int k=0, reverse[size];
+
+	//Loop from back and assign value to new array
+	for(int i=size-1; i>=0; ){
+		  reverse[k++] = data[i--];
+	}*/
+
+
+	for(int i = 0; i < 4; i++){
+		  printf("Display = %d \n", Display[i]);
+	}
+
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  memset(Display, 0x00, 8);
+	  configure(data, D);
+	  DisplayUpdate(Display, data);
+	  HAL_LCD_Clear(&hlcd);
+	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER0, 0xffff, Display[0]);
+	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER2, 0xffff, Display[1]);
+	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER4, 0xffff, Display[2]);
+	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER6, 0xffff, Display[3]);
+	  HAL_LCD_UpdateDisplayRequest(&hlcd);
+	  D++;
+	  HAL_Delay(1000);
 	  /*HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER0, 0xffff, 0xffff);
 	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER2, 0xffff, 0xffff);
 	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER4, 0xffff, 0xffff);
@@ -490,21 +626,24 @@ static void MX_LCD_Init(void)
   /* USER CODE END LCD_Init 1 */
   hlcd.Instance = LCD;
   hlcd.Init.Prescaler = LCD_PRESCALER_1;
-  hlcd.Init.Divider = LCD_DIVIDER_16;
+  hlcd.Init.Divider = LCD_DIVIDER_31;
   hlcd.Init.Duty = LCD_DUTY_1_4;
   hlcd.Init.Bias = LCD_BIAS_1_3;
   hlcd.Init.VoltageSource = LCD_VOLTAGESOURCE_INTERNAL;
   hlcd.Init.Contrast = LCD_CONTRASTLEVEL_3;
-  hlcd.Init.DeadTime = LCD_DEADTIME_0;
-  hlcd.Init.PulseOnDuration = LCD_PULSEONDURATION_0;
+  hlcd.Init.DeadTime = LCD_DEADTIME_3;
+  hlcd.Init.PulseOnDuration = LCD_PULSEONDURATION_1;
   hlcd.Init.MuxSegment = LCD_MUXSEGMENT_ENABLE;
   hlcd.Init.BlinkMode = LCD_BLINKMODE_OFF;
   hlcd.Init.BlinkFrequency = LCD_BLINKFREQUENCY_DIV8;
-  hlcd.Init.HighDrive = LCD_HIGHDRIVE_DISABLE;
+  hlcd.Init.HighDrive = LCD_HIGHDRIVE_ENABLE;
   if (HAL_LCD_Init(&hlcd) != HAL_OK)
   {
     Error_Handler();
   }
+  /** Enable the High Driver
+  */
+  __HAL_LCD_HIGHDRIVER_ENABLE(&hlcd);
   /* USER CODE BEGIN LCD_Init 2 */
 
   /* USER CODE END LCD_Init 2 */
@@ -684,9 +823,6 @@ static void MX_GPIO_Init(void)
                           |PWM180_Pin|PWM225_Pin|PWM270_Pin|PWM315_Pin
                           |BIAS_Pin|ADC_TRIG_OUT_Pin|PERIOD_Pin|TIMEBASE_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(SHIELD_GPIO_Port, SHIELD_Pin, GPIO_PIN_RESET);
-
   /*Configure GPIO pins : PWM0_Pin PWM45_Pin PWM90_Pin PWM135_Pin
                            PWM180_Pin PWM225_Pin PWM270_Pin PWM315_Pin
                            ADC_TRIG_OUT_Pin PERIOD_Pin TIMEBASE_Pin */
@@ -697,13 +833,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : SHIELD_Pin */
-  GPIO_InitStruct.Pin = SHIELD_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(SHIELD_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : BIAS_Pin */
   GPIO_InitStruct.Pin = BIAS_Pin;
