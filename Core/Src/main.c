@@ -102,9 +102,11 @@ uint8_t dataRdyFlag = 0;
 float logging[1024] = {0};
 int timing[1024] = {0};
 int logcount = 0;
-float offset = 310.3122;
+float offset = 295.3122;
+float zero = 295.3122;
 float tempf;
 int tempi;
+int tempi2;
 //uint16_t data[2] = {0xFFFF, 0x0000};
 /* USER CODE END PV */
 
@@ -118,6 +120,15 @@ static void MX_DMA_Init(void);
 static void MX_TIM6_Init(void);
 static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
+int movingAvg(int *ptrArrNumbers, long *ptrSum, int pos, int len, int nextNum)
+{
+  //Subtract the oldest number from the prev sum, add the new number
+  *ptrSum = *ptrSum - ptrArrNumbers[pos] + nextNum;
+  //Assign the nextNum to the position in the array
+  ptrArrNumbers[pos] = nextNum;
+  //return the average
+  return *ptrSum / len;
+}
 // configures data into an array of 4 individual values
 void configure(int* ptr, int D){
       //int dec = D*100;
@@ -299,10 +310,10 @@ void generate_ODR_Buff()
 			ODRVal |= BIAS_Pin; // Bias signal: 8T Period 3T LOW 5T HIGH
 		if (adcTrig)
 			ODRVal |= ADC_TRIG_OUT_Pin; // ADC external trigger signal: 8T Period
-		if (timeBase)
+		/*if (timeBase)
 			ODRVal |= TIMEBASE_Pin;     // DBG signal: TimeBase smallest period 1T
 		if (period)
-			ODRVal |= PERIOD_Pin; // DBG signal: Period is the modulated Sine period. 512/2=256, 256T HIGH followed by 256T LOW
+			ODRVal |= PERIOD_Pin; // DBG signal: Period is the modulated Sine period. 512/2=256, 256T HIGH followed by 256T LOW*/
 
 		/* Store OCTL value in buffer */
 		ODR_Buff[i] = ODRVal;
@@ -409,14 +420,14 @@ void sensor_signalProcessing()
 
     phaseDeg = (phaseRad * 180) / M_PI; // 0 to 360 degrees
     phaseDegDisp = round((phaseRad * 180) / M_PI);
-    if(logcount<1024){
+    /*if(logcount<1024){
     	logging[logcount] = phaseDeg;
     	timing[logcount] = HAL_GetTick();
     	logcount++;
     }
     else{
     	logcount = 1025;
-    }
+    }*/
     // Calculate magnitude
     magnitude = sqrt(fabs(real) + fabs(imag));
 }
@@ -493,31 +504,68 @@ int main(void)
 	for(int i = 0; i < 4; i++){
 		  printf("Display = %d \n", Display[i]);
 	}
-
-
+	int arrNumbers[5] = {0};
+	int pos = 0;
+	  int newAvg = 0;
+	  long sum = 0;
+	  int len = sizeof(arrNumbers) / sizeof(int);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_12)==0){
+		  zero = phaseDeg;
+		  /*for(int i=0; i<len; i++){
+			  arrNumbers[i] = 0;
+		  }*/
+	  }
 	  if(dataRdyFlag)
 	  {
+		  sensor_signalProcessing();
 		  memset(Display, 0x00, 8);
-		  	  tempf = constrainAngle(phaseDeg-offset);
-		  	  tempf *= 100;
-		  	  tempi = (int)tempf;
-		  	  configure(data, angleLut[tempi]);
+		 		  	  tempf = constrainAngle(phaseDeg-offset);
+		 		  	  tempf *= 100;
+		 		  	  tempi = (int)tempf;
+		 		  	  tempf = constrainAngle(zero-offset);
+		 		  	  tempf *= 100;
+		 		  	  tempi2 = (int)tempf;
+		 		  	newAvg = movingAvg(arrNumbers, &sum, pos, len, angleLut[tempi]-angleLut[tempi2]);
+		 		  	pos++;
+		 		  	    if (pos >= len){
+		 		  	      pos = 0;
+		 		  	    }
+		 		  	  configure(data, abs(newAvg));
+		 		  	  //configure(data, angleLut[tempi]);
 		  	  DisplayUpdate(Display, data);
 		  	  HAL_LCD_Clear(&hlcd);
-		  	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER0, 0xffff, Display[0]);
+		  	  //HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER0, 0xffff, 0x0040);
+		  	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER0, 0xffff, Display[0]|0x0040);
 		  	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER2, 0xffff, Display[1]);
 		  	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER4, 0xffff, Display[2]);
 		  	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER6, 0xffff, Display[3]);
 		  	  HAL_LCD_UpdateDisplayRequest(&hlcd);
+		  	if(newAvg>20){
+		  			  		  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+		  			  		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 1);
+		  			  		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, 1);
+		  			  		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 1);
+		  			  	  }
+		  	if(newAvg<-20){
+		  			  			  		  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
+		  			  			  		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 1);
+		  			  			  		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, 0);
+		  			  			  		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 1);
+		  			  			  	  }
+		  	if(newAvg<20 && newAvg>-20){
+		  			  			  		  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
+		  			  			  		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
+		  			  			  		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, 1);
+		  			  			  		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 0);
+		  			  			  	  }
 		  dataRdyFlag = 0;
-		  sensor_signalProcessing();
-		  printf("%i\n\r", (int)phaseDegDisp);
+		  //printf("%i\n\r", (int)phaseDegDisp);
 		  HAL_Delay(50);
 	  }
     /* USER CODE END WHILE */
@@ -686,7 +734,6 @@ static void MX_TIM2_Init(void)
 
   TIM_ClockConfigTypeDef sClockSourceConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
-  TIM_OC_InitTypeDef sConfigOC = {0};
 
   /* USER CODE BEGIN TIM2_Init 1 */
 
@@ -706,41 +753,15 @@ static void MX_TIM2_Init(void)
   {
     Error_Handler();
   }
-  if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
-  {
-    Error_Handler();
-  }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
   if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
   {
     Error_Handler();
   }
-  sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 5000;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_LOW;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sConfigOC.Pulse = 0;
-  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_4) != HAL_OK)
-  {
-    Error_Handler();
-  }
   /* USER CODE BEGIN TIM2_Init 2 */
 
   /* USER CODE END TIM2_Init 2 */
-  HAL_TIM_MspPostInit(&htim2);
 
 }
 
@@ -854,18 +875,38 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, PWM0_Pin|PWM45_Pin|PWM90_Pin|PWM135_Pin
                           |PWM180_Pin|PWM225_Pin|PWM270_Pin|PWM315_Pin
-                          |BIAS_Pin|ADC_TRIG_OUT_Pin|PERIOD_Pin|TIMEBASE_Pin, GPIO_PIN_RESET);
+                          |BIAS_Pin|ADC_TRIG_OUT_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0|GPIO_PIN_1, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10|GPIO_PIN_11, GPIO_PIN_SET);
 
   /*Configure GPIO pins : PWM0_Pin PWM45_Pin PWM90_Pin PWM135_Pin
                            PWM180_Pin PWM225_Pin PWM270_Pin PWM315_Pin
-                           ADC_TRIG_OUT_Pin PERIOD_Pin TIMEBASE_Pin */
+                           ADC_TRIG_OUT_Pin */
   GPIO_InitStruct.Pin = PWM0_Pin|PWM45_Pin|PWM90_Pin|PWM135_Pin
                           |PWM180_Pin|PWM225_Pin|PWM270_Pin|PWM315_Pin
-                          |ADC_TRIG_OUT_Pin|PERIOD_Pin|TIMEBASE_Pin;
+                          |ADC_TRIG_OUT_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PA0 PA1 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PB10 PB11 */
+  GPIO_InitStruct.Pin = GPIO_PIN_10|GPIO_PIN_11;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pin : BIAS_Pin */
   GPIO_InitStruct.Pin = BIAS_Pin;
@@ -874,15 +915,29 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
   HAL_GPIO_Init(BIAS_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PA11 PA12 */
-  GPIO_InitStruct.Pin = GPIO_PIN_11|GPIO_PIN_12;
+  /*Configure GPIO pin : PA11 */
+  GPIO_InitStruct.Pin = GPIO_PIN_11;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : PA12 */
+  GPIO_InitStruct.Pin = GPIO_PIN_12;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+
 }
 
 /* USER CODE BEGIN 4 */
+/*void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+    zero = phaseDeg;
+}*/
 void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef* hadc)
 {
 	memcpy(processBuff, samples, 128);
