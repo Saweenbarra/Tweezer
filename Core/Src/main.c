@@ -24,6 +24,7 @@
 #include "stdio.h"
 #include "math.h"
 #include <stdint.h>
+#include "Tweezer_phase_Lookup.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -49,6 +50,7 @@ DMA_HandleTypeDef hdma_adc1;
 
 LCD_HandleTypeDef hlcd;
 
+TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim6;
 DMA_HandleTypeDef hdma_tim6_up;
 
@@ -92,10 +94,17 @@ static double imag = 0; //Imaginary part of sensor signal
 static double magnitude = 0; //Amplitude of sensor signal
 static double phaseRad = 0;  //Phase in radians
 static double phaseDeg = 0;  //Phase in degrees
+static double phaseDegDisp = 0;
 
 static int quadrant = 1;
 
 uint8_t dataRdyFlag = 0;
+float logging[1024] = {0};
+int timing[1024] = {0};
+int logcount = 0;
+float offset = 310.3122;
+float tempf;
+int tempi;
 //uint16_t data[2] = {0xFFFF, 0x0000};
 /* USER CODE END PV */
 
@@ -107,6 +116,7 @@ static void MX_ADC1_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_DMA_Init(void);
 static void MX_TIM6_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 // configures data into an array of 4 individual values
 void configure(int* ptr, int D){
@@ -225,11 +235,20 @@ uint32_t calcBuffLoc(uint32_t startPos, uint32_t offSet, uint32_t buffSize)
         return newLoc - buffSize; // Loop Around
     }
 }
+float constrainAngle(float x){
+	x= fmod(x,360);
+	if (x<0){
+		x += 360;
+	}
+	return x;
+}
 void generate_ODR_Buff()
 {
 	const uint8_t singlePhaseBuff[TX_BUFF_SIZE] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0};
-	const uint8_t biasBuff[BIAS_BUFF_SIZE] = {0, 0, 0, 1, 1, 1, 1, 1};
-	//const uint8_t biasBuff[BIAS_BUFF_SIZE] = {1, 1, 1, 0, 0, 0, 0, 0}; FOR TESTING ON BREADBOARD
+	//const uint8_t biasBuff[BIAS_BUFF_SIZE] = {0, 0, 0, 1, 1, 1, 1, 1};//ORIGINAL
+	//const uint8_t biasBuff[BIAS_BUFF_SIZE] = {0, 0, 0, 0, 0, 0, 0, 1};//shorter active period
+	//const uint8_t biasBuff[BIAS_BUFF_SIZE] = {0, 0, 0, 0, 0, 0, 0, 0};//NO BIAS TEST
+	const uint8_t biasBuff[BIAS_BUFF_SIZE] = {1, 1, 1, 0, 0, 0, 0, 0};// FOR TESTING ON BREADBOARD
 
 	uint32_t tx0Loc, tx1Loc, tx2Loc, tx3Loc, tx4Loc, tx5Loc, tx6Loc, tx7Loc = 0; // 0 ... 512-1: TX buffer locations
 	uint32_t biasLoc = 0;                                                        // 0 ... 8-1: Bias buffer location
@@ -388,9 +407,16 @@ void sensor_signalProcessing()
         quadrant = 4;
     }
 
-    // phaseDeg = (phaseRad * 180) / M_PI; // 0 to 360 degrees
-    phaseDeg = round((phaseRad * 180) / M_PI);
-
+    phaseDeg = (phaseRad * 180) / M_PI; // 0 to 360 degrees
+    phaseDegDisp = round((phaseRad * 180) / M_PI);
+    if(logcount<1024){
+    	logging[logcount] = phaseDeg;
+    	timing[logcount] = HAL_GetTick();
+    	logcount++;
+    }
+    else{
+    	logcount = 1025;
+    }
     // Calculate magnitude
     magnitude = sqrt(fabs(real) + fabs(imag));
 }
@@ -434,12 +460,18 @@ int main(void)
   MX_USART1_UART_Init();
   MX_DMA_Init();
   MX_TIM6_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   generate_ODR_Buff();
   generateLuts();
   HAL_DMA_Start(&hdma_tim6_up, (uint32_t)&ODR_Buff, (uint32_t)&GPIOC->ODR, TX_BUFF_SIZE);
   __HAL_TIM_ENABLE_DMA(&htim6, TIM_DMA_UPDATE);
   HAL_TIM_Base_Start(&htim6);
+  //HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+  //__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 0);
+  //HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
+  //HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
+  //HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_4);
 
   HAL_ADC_Start_DMA(&hadc1, (uint32_t*)samples, SAMPLE_BUFF_SIZE);
   //__HAL_TIM_ENABLE_DMA(&htim2, TIM_DMA_UPDATE);
@@ -469,19 +501,13 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  /*HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER0, 0xffff, 0xffff);
-	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER2, 0xffff, 0xffff);
-	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER4, 0xffff, 0xffff);
-	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER6, 0xffff, 0xffff);
-	  HAL_LCD_UpdateDisplayRequest(&hlcd);
-	  HAL_Delay(500);
-	  HAL_LCD_Clear(&hlcd);
-	  HAL_LCD_UpdateDisplayRequest(&hlcd);
-	  HAL_Delay(500);*/
 	  if(dataRdyFlag)
 	  {
 		  memset(Display, 0x00, 8);
-		  	  configure(data, (int)phaseDeg);
+		  	  tempf = constrainAngle(phaseDeg-offset);
+		  	  tempf *= 100;
+		  	  tempi = (int)tempf;
+		  	  configure(data, angleLut[tempi]);
 		  	  DisplayUpdate(Display, data);
 		  	  HAL_LCD_Clear(&hlcd);
 		  	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER0, 0xffff, Display[0]);
@@ -491,7 +517,7 @@ int main(void)
 		  	  HAL_LCD_UpdateDisplayRequest(&hlcd);
 		  dataRdyFlag = 0;
 		  sensor_signalProcessing();
-		  printf("%i\n\r", (int)phaseDeg);
+		  printf("%i\n\r", (int)phaseDegDisp);
 		  HAL_Delay(50);
 	  }
     /* USER CODE END WHILE */
@@ -525,11 +551,11 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
-  RCC_OscInitStruct.PLL.PLLM = 1;
+  RCC_OscInitStruct.PLL.PLLM = 2;
   RCC_OscInitStruct.PLL.PLLN = 8;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV7;
   RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
-  RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
+  RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV8;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -543,7 +569,7 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_3) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
   {
     Error_Handler();
   }
@@ -643,6 +669,78 @@ static void MX_LCD_Init(void)
   /* USER CODE BEGIN LCD_Init 2 */
 
   /* USER CODE END LCD_Init 2 */
+
+}
+
+/**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 8000-1;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 1000000;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 5000;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_LOW;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.Pulse = 0;
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+  HAL_TIM_MspPostInit(&htim2);
 
 }
 
@@ -758,36 +856,23 @@ static void MX_GPIO_Init(void)
                           |PWM180_Pin|PWM225_Pin|PWM270_Pin|PWM315_Pin
                           |BIAS_Pin|ADC_TRIG_OUT_Pin|PERIOD_Pin|TIMEBASE_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0|GPIO_PIN_1, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10|GPIO_PIN_11, GPIO_PIN_RESET);
-
   /*Configure GPIO pins : PWM0_Pin PWM45_Pin PWM90_Pin PWM135_Pin
                            PWM180_Pin PWM225_Pin PWM270_Pin PWM315_Pin
-                           BIAS_Pin ADC_TRIG_OUT_Pin PERIOD_Pin TIMEBASE_Pin */
+                           ADC_TRIG_OUT_Pin PERIOD_Pin TIMEBASE_Pin */
   GPIO_InitStruct.Pin = PWM0_Pin|PWM45_Pin|PWM90_Pin|PWM135_Pin
                           |PWM180_Pin|PWM225_Pin|PWM270_Pin|PWM315_Pin
-                          |BIAS_Pin|ADC_TRIG_OUT_Pin|PERIOD_Pin|TIMEBASE_Pin;
+                          |ADC_TRIG_OUT_Pin|PERIOD_Pin|TIMEBASE_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PA0 PA1 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  /*Configure GPIO pin : BIAS_Pin */
+  GPIO_InitStruct.Pin = BIAS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : PB10 PB11 */
-  GPIO_InitStruct.Pin = GPIO_PIN_10|GPIO_PIN_11;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  HAL_GPIO_Init(BIAS_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PA11 PA12 */
   GPIO_InitStruct.Pin = GPIO_PIN_11|GPIO_PIN_12;
