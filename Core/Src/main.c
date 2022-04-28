@@ -37,6 +37,7 @@
 #define TX_BUFF_SIZE 512
 #define SAMPLE_BUFF_SIZE 128 //2 periods
 #define BIAS_BUFF_SIZE 8
+#define display_delay 50
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -107,6 +108,7 @@ float zero = 295.3122;
 float tempf;
 int tempi;
 int tempi2;
+int lastTime = 0;
 //uint16_t data[2] = {0xFFFF, 0x0000};
 /* USER CODE END PV */
 
@@ -538,35 +540,37 @@ int main(void)
 		 		  	    }
 		 		  	  configure(data, abs(newAvg));
 		 		  	  //configure(data, angleLut[tempi]);
-		  	  DisplayUpdate(Display, data);
-		  	  HAL_LCD_Clear(&hlcd);
-		  	  //HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER0, 0xffff, 0x0040);
-		  	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER0, 0xffff, Display[0]|0x0040);
-		  	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER2, 0xffff, Display[1]);
-		  	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER4, 0xffff, Display[2]);
-		  	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER6, 0xffff, Display[3]);
-		  	  HAL_LCD_UpdateDisplayRequest(&hlcd);
-		  	if(newAvg>20){
-		  			  		  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
-		  			  		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 1);
-		  			  		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, 1);
-		  			  		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 1);
-		  			  	  }
-		  	if(newAvg<-20){
-		  			  			  		  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
-		  			  			  		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 1);
-		  			  			  		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, 0);
-		  			  			  		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 1);
-		  			  			  	  }
-		  	if(newAvg<20 && newAvg>-20){
-		  			  			  		  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
-		  			  			  		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
-		  			  			  		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, 1);
-		  			  			  		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 0);
-		  			  			  	  }
+
 		  dataRdyFlag = 0;
-		  //printf("%i\n\r", (int)phaseDegDisp);
-		  HAL_Delay(50);
+	  }
+	  if(HAL_GetTick()-lastTime>display_delay){
+		  lastTime = HAL_GetTick();
+		  DisplayUpdate(Display, data);
+		  		  	  HAL_LCD_Clear(&hlcd);
+		  		  	  //HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER0, 0xffff, 0x0040);
+		  		  	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER0, 0xffff, Display[0]|0x0040);
+		  		  	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER2, 0xffff, Display[1]);
+		  		  	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER4, 0xffff, Display[2]);
+		  		  	  HAL_LCD_Write(&hlcd, LCD_RAM_REGISTER6, 0xffff, Display[3]);
+		  		  	  HAL_LCD_UpdateDisplayRequest(&hlcd);
+		  		  	if(newAvg>20){
+		  		  			  		  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+		  		  			  		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 1);
+		  		  			  		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, 1);
+		  		  			  		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 1);
+		  		  			  	  }
+		  		  	if(newAvg<-20){
+		  		  			  			  		  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
+		  		  			  			  		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 1);
+		  		  			  			  		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, 0);
+		  		  			  			  		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 1);
+		  		  			  			  	  }
+		  		  	if(newAvg<20 && newAvg>-20){
+		  		  			  			  		  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
+		  		  			  			  		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
+		  		  			  			  		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, 1);
+		  		  			  			  		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 0);
+		  		  			  			  	  }
 	  }
     /* USER CODE END WHILE */
 
