@@ -24,7 +24,8 @@
 #include "stdio.h"
 #include "math.h"
 #include <stdint.h>
-#include <Tweezer_phase_Lookup_T1.h>
+#include <Tweezer_phase_Lookup_old.h>
+#include "compensate.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -103,8 +104,8 @@ uint8_t dataRdyFlag = 0;
 float logging[1024] = {0};
 int timing[1024] = {0};
 int logcount = 0;
-float offset = 326;
-float zero = 326;
+float offset = 320;
+float zero = 320;
 float tempf;
 int tempi;
 int tempi2;
@@ -530,15 +531,17 @@ int main(void)
 		 		  	  tempf = constrainAngle(phaseDeg-offset);
 		 		  	  tempf *= 100;
 		 		  	  tempi = (int)tempf;
+		 		  	  tempi = compensate(angleLut[tempi]);
 		 		  	  tempf = constrainAngle(zero-offset);
 		 		  	  tempf *= 100;
 		 		  	  tempi2 = (int)tempf;
-		 		  	newAvg = movingAvg(arrNumbers, &sum, pos, len, angleLut[tempi]-angleLut[tempi2]);
+		 		  	  tempi2 = compensate(angleLut[tempi2]);
+		 		  	newAvg = movingAvg(arrNumbers, &sum, pos, len, abs(tempi-tempi2));
 		 		  	pos++;
 		 		  	    if (pos >= len){
 		 		  	      pos = 0;
 		 		  	    }
-		 		  	  configure(data, abs(newAvg));
+		 		  	  configure(data, newAvg);
 		 		  	  //configure(data, angleLut[tempi]);
 
 		  dataRdyFlag = 0;
