@@ -24,7 +24,7 @@
 #include "stdio.h"
 #include "math.h"
 #include <stdint.h>
-#include "Tweezer_phase_Lookup.h"
+#include <Tweezer_phase_Lookup_T1.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -103,8 +103,8 @@ uint8_t dataRdyFlag = 0;
 float logging[1024] = {0};
 int timing[1024] = {0};
 int logcount = 0;
-float offset = 320;
-float zero = 320;
+float offset = 326;
+float zero = 326;
 float tempf;
 int tempi;
 int tempi2;
