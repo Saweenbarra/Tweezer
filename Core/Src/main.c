@@ -17,7 +17,8 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-#include <offset_smoothed.h>
+//#include <Connors_LUT.h>
+#include <Connors_LUT2.h>
 #include "main.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -103,8 +104,8 @@ uint8_t dataRdyFlag = 0;
 float logging[1024] = {0};
 int timing[1024] = {0};
 int logcount = 0;
-float offset = 327;
-float zero = 327;
+float offset = 324;
+float zero = 324;
 float tempf;
 int tempi;
 int tempi2;
