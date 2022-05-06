@@ -17,6 +17,7 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
+#include <offset_smoothed.h>
 #include "main.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -24,7 +25,6 @@
 #include "stdio.h"
 #include "math.h"
 #include <stdint.h>
-#include <Tweezer_phase_Lookup_T1.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -103,8 +103,8 @@ uint8_t dataRdyFlag = 0;
 float logging[1024] = {0};
 int timing[1024] = {0};
 int logcount = 0;
-float offset = 326;
-float zero = 326;
+float offset = 327;
+float zero = 327;
 float tempf;
 int tempi;
 int tempi2;
