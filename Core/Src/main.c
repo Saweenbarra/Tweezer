@@ -18,7 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 //#include <Connors_LUT.h>
-#include <Connors_LUT2.h>
+#include <THE_LUT.h>
 #include "main.h"
 
 /* Private includes ----------------------------------------------------------*/
